@@ -210,6 +210,35 @@ async def agregar_notas(nombre: str, texto: str) -> bool:
         return updated > 0
 
 
+async def actualizar_semana(nombres_ausentes: list[str]) -> tuple[int, list[str]]:
+    """Marca como activos todos los miembros excepto los ausentes.
+    Devuelve (cantidad actualizados, nombres no encontrados en la lista de ausentes)."""
+    ausentes_lower = {n.lower() for n in nombres_ausentes}
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT id, nombre FROM miembros WHERE activo = 1"
+        ) as cur:
+            todos = await cur.fetchall()
+
+        no_encontrados = [n for n in nombres_ausentes if not any(n.lower() == m[1].lower() for m in todos)]
+        actualizados = 0
+        for miembro_id, nombre in todos:
+            if nombre.lower() not in ausentes_lower:
+                await db.execute(
+                    """UPDATE miembros
+                       SET ultima_actividad = date('now'), ausencia_justificada = 0, justificacion = NULL
+                       WHERE id = ?""",
+                    (miembro_id,),
+                )
+                await db.execute(
+                    "INSERT INTO historial (miembro_id, tipo, detalle) VALUES (?, 'actividad', 'actualizacion semanal')",
+                    (miembro_id,),
+                )
+                actualizados += 1
+        await db.commit()
+        return actualizados, no_encontrados
+
+
 async def get_miembros_inactivos(dias: int) -> list[dict]:
     limite = (date.today() - timedelta(days=dias)).isoformat()
     async with aiosqlite.connect(DB_PATH) as db:

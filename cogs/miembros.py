@@ -12,6 +12,35 @@ def dias_desde(fecha_str: str) -> int:
     return (date.today() - datetime.strptime(fecha_str, "%Y-%m-%d").date()).days
 
 
+class SemanaModal(discord.ui.Modal, title="Actualización Semanal"):
+    ausentes = discord.ui.TextInput(
+        label="Ausentes esta semana (uno por línea o por coma)",
+        style=discord.TextStyle.paragraph,
+        placeholder="Deja vacío si todos estuvieron activos\nNombre1\nNombre2",
+        required=False,
+        max_length=2000,
+    )
+
+    async def on_submit(self, interaction: discord.Interaction):
+        nombres_ausentes = (
+            [n.strip() for n in self.ausentes.value.replace(",", "\n").split("\n") if n.strip()]
+            if self.ausentes.value.strip()
+            else []
+        )
+
+        actualizados, no_encontrados = await database.actualizar_semana(nombres_ausentes)
+
+        msg = f"✅ **Semana actualizada.** {actualizados} miembro(s) marcado(s) como activos."
+        if nombres_ausentes:
+            encontrados = [n for n in nombres_ausentes if n not in no_encontrados]
+            if encontrados:
+                msg += f"\n⚠️ Ausentes registrados: {', '.join(encontrados)}"
+        if no_encontrados:
+            msg += f"\n❓ No encontrados en el clan: {', '.join(no_encontrados)}"
+
+        await interaction.response.send_message(msg)
+
+
 class ImportarModal(discord.ui.Modal, title="Importar Miembros"):
     lista = discord.ui.TextInput(
         label="Miembros (uno por línea o separados por coma)",
@@ -198,6 +227,12 @@ class Miembros(commands.Cog):
             )
 
         await interaction.response.send_message(embed=embed)
+
+    @app_commands.command(name="semana", description="Actualización semanal: marca activos a todos excepto los ausentes")
+    async def semana(self, interaction: discord.Interaction):
+        if not self.es_staff(interaction):
+            return await self.sin_permiso(interaction)
+        await interaction.response.send_modal(SemanaModal())
 
     @app_commands.command(name="importar", description="Importar lista de miembros del juego")
     async def importar(self, interaction: discord.Interaction):
