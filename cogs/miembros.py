@@ -14,7 +14,7 @@ def dias_desde(fecha_str: str) -> int:
 
 class SemanaModal(discord.ui.Modal, title="Actualización Semanal"):
     ausentes = discord.ui.TextInput(
-        label="Ausentes esta semana (uno por línea o por coma)",
+        label="Ausentes esta semana (uno por línea)",
         style=discord.TextStyle.paragraph,
         placeholder="Deja vacío si todos estuvieron activos\nNombre1\nNombre2",
         required=False,
